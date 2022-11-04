@@ -34,6 +34,7 @@
 		3CF9779E11C77A23004CD74C /* DataController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CF9779D11C77A23004CD74C /* DataController.mm */; };
 		3CF978C611C7B34C004CD74C /* DataSources.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CF978C511C7B34C004CD74C /* DataSources.mm */; };
 		3CF97F0F11C91F93004CD74C /* MachOLayout.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CF97F0E11C91F93004CD74C /* MachOLayout.mm */; };
+		6D97202D2643F6B100AD083E /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D97202C2643F6B100AD083E /* libc++.tbd */; };
 		7B111E4717DC33F8008ED484 /* Attach.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7B111E4617DC33F8008ED484 /* Attach.mm */; };
 		7B7828C01A1E017B00AE03DB /* AArch64BaseInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = 7B7828631A1E017B00AE03DB /* AArch64BaseInfo.c */; };
 		7B7828C11A1E017B00AE03DB /* AArch64Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = 7B7828651A1E017B00AE03DB /* AArch64Disassembler.c */; };
@@ -140,6 +141,7 @@
 		3CF978C511C7B34C004CD74C /* DataSources.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = DataSources.mm; sourceTree = "<group>"; };
 		3CF97F0D11C91F93004CD74C /* MachOLayout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; path = MachOLayout.h; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.objcpp; };
 		3CF97F0E11C91F93004CD74C /* MachOLayout.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; lineEnding = 0; path = MachOLayout.mm; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.objcpp; };
+		6D97202C2643F6B100AD083E /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		7B111E4617DC33F8008ED484 /* Attach.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Attach.mm; sourceTree = "<group>"; };
 		7B111E4817DC3401008ED484 /* Attach.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Attach.h; sourceTree = "<group>"; };
 		7B5E71E319B6829F00843CCE /* libcapstone.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcapstone.a; path = capstone/libcapstone.a; sourceTree = "<group>"; };
@@ -216,6 +218,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6D97202D2643F6B100AD083E /* libc++.tbd in Frameworks */,
 				3CC0022211F64A45000F7A3D /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -337,6 +340,7 @@
 		29B97323FDCFA39411CA2CEA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				6D97202C2643F6B100AD083E /* libc++.tbd */,
 				7B5E71E319B6829F00843CCE /* libcapstone.a */,
 				1058C7A0FEA54F0111CA2CBB /* Linked Frameworks */,
 				1058C7A2FEA54F0111CA2CBB /* Other Frameworks */,
@@ -686,6 +690,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				CONFIGURATION_TEMP_DIR = "$(inherited)";
@@ -726,7 +731,7 @@
 				);
 				PRIVATE_HEADERS_FOLDER_PATH = "";
 				PRODUCT_NAME = MachOView;
-				SDKROOT = macosx10.9;
+				SDKROOT = macosx;
 				USER_HEADER_SEARCH_PATHS = "";
 				VALID_ARCHS = "$(inherited)";
 				VERSIONING_SYSTEM = "";
@@ -738,6 +743,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				CONFIGURATION_TEMP_DIR = "$(inherited)";
@@ -781,7 +787,7 @@
 				);
 				PRIVATE_HEADERS_FOLDER_PATH = "";
 				PRODUCT_NAME = MachOView;
-				SDKROOT = macosx10.9;
+				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				USER_HEADER_SEARCH_PATHS = "";
 				VALID_ARCHS = "$(inherited)";
