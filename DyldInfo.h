@@ -7,7 +7,7 @@
  */
 
 #import "MachOLayout.h"
-
+#include <mach-o/fixup-chains.h>
 
 @interface DyldHelper : NSObject
 {
@@ -42,5 +42,28 @@ enum BindNodeType {NodeTypeBind, NodeTypeWeakBind, NodeTypeLazyBind};
                     location:(uint32_t)location
                       length:(uint32_t)length
                  baseAddress:(uint64_t)baseAddress;
+
+- (MVNode *)createFixupHeaderNode:(MVNode *)parent
+                      caption:(NSString *)caption
+                     location:(uint32_t)location
+                           header:(struct dyld_chained_fixups_header const *)header;
+- (MVNode *)createFixupImageNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                   startsInImage:(struct dyld_chained_starts_in_image const *)startsInImage;
+- (MVNode *)createFixupImageSegmentNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                                 offset:(uint32_t)offset
+                        startsInSegment:(struct dyld_chained_starts_in_segment const *)startsInSegment;
+
+- (MVNode *)createFixupPageStartsNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                        pageIndex:(uint32_t)pageIndex
+                           fixup_base:(uint32_t)fixup_base
+                              segname:(const char *)segname
+                      header:(struct dyld_chained_fixups_header const *)header
+                      startsInSegment:(struct dyld_chained_starts_in_segment const *)startsInSegment;
 
 @end

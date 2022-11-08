@@ -15,6 +15,7 @@
 #import "DyldInfo.h"
 #import "ReadWrite.h"
 #import "DataController.h"
+#include <mach-o/fixup-chains.h>
 
 using namespace std;
 
@@ -922,6 +923,283 @@ using namespace std;
   [actionNode sortDetails];
   
   return node;
+}
+//-----------------------------------------------------------------------------
+
+- (MVNode *)createFixupHeaderNode:(MVNode *)parent
+                      caption:(NSString *)caption
+                     location:(uint32_t)location
+                    header:(struct dyld_chained_fixups_header const *)header
+{
+  MVNodeSaver nodeSaver;
+  MVNode * node = [parent insertChildWithDetails:caption location:location length:sizeof(struct dyld_chained_fixups_header) saver:nodeSaver];
+  
+  NSRange range = NSMakeRange(location,0);
+  NSString * lastReadHex;
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"fixups_version"
+                           :@(header->fixups_version).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"starts_offset"
+                           :@(header->starts_offset).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"imports_offset"
+                           :@(header->imports_offset).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"symbols_offset"
+                           :@(header->symbols_offset).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"imports_count"
+                           :@(header->imports_count).stringValue];
+  
+  [dataController read_uint32:range lastReadHex:&lastReadHex];
+    const char *imports_format = "???";
+    switch (header->imports_format) {
+        case DYLD_CHAINED_IMPORT: imports_format = "DYLD_CHAINED_IMPORT"; break;
+        case DYLD_CHAINED_IMPORT_ADDEND: imports_format = "DYLD_CHAINED_IMPORT_ADDEND"; break;
+        case DYLD_CHAINED_IMPORT_ADDEND64: imports_format = "DYLD_CHAINED_IMPORT_ADDEND64"; break;
+    }
+  [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                         :lastReadHex
+                         :@"imports_format"
+                         :[[NSString alloc] initWithCString:imports_format encoding:NSUTF8StringEncoding]];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"symbols_format"
+                           :header->symbols_format == 0 ? @"UNCOMPRESSED" : @"ZLIB COMPRESSED"];
+  
+  return node;
+}
+//-----------------------------------------------------------------------------
+
+- (MVNode *)createFixupImageNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                 startsInImage:(struct dyld_chained_starts_in_image const *)startsInImage
+{
+    MVNodeSaver nodeSaver;
+    MVNode * node = [parent insertChildWithDetails:caption location:location length:sizeof(struct dyld_chained_starts_in_image) saver:nodeSaver];
+    
+    NSRange range = NSMakeRange(location,0);
+    NSString * lastReadHex;
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"seg_count"
+                           :@(startsInImage->seg_count).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"seg_info_offset"
+                           :@""];
+    for (uint32_t i = 0; i < startsInImage->seg_count; i++) {
+        [node.details appendRow:@""
+                               :@""
+                               :[NSString stringWithFormat:@"offset: %d", i]
+                               :@(startsInImage->seg_info_offset[i]).stringValue];
+//        NSLog(@"--- seg_info_offset: %d", header->seg_info_offset[i]);
+    }
+//    NSLog(@"--- seg_info_offset end");
+    
+    return node;
+}
+//-----------------------------------------------------------------------------
+
+static void formatPointerFormat(uint16_t pointer_format, char *formatted) {
+    switch(pointer_format) {
+        case DYLD_CHAINED_PTR_ARM64E: strcpy(formatted, "DYLD_CHAINED_PTR_ARM64E"); break;
+        case DYLD_CHAINED_PTR_64: strcpy(formatted, "DYLD_CHAINED_PTR_64"); break;
+        case DYLD_CHAINED_PTR_32: strcpy(formatted, "DYLD_CHAINED_PTR_32"); break;
+        case DYLD_CHAINED_PTR_32_CACHE: strcpy(formatted, "DYLD_CHAINED_PTR_32_CACHE"); break;
+        case DYLD_CHAINED_PTR_32_FIRMWARE: strcpy(formatted, "DYLD_CHAINED_PTR_32_FIRMWARE"); break;
+        case DYLD_CHAINED_PTR_64_OFFSET: strcpy(formatted, "DYLD_CHAINED_PTR_64_OFFSET"); break;
+        case DYLD_CHAINED_PTR_ARM64E_KERNEL: strcpy(formatted, "DYLD_CHAINED_PTR_ARM64E_KERNEL"); break;
+        case DYLD_CHAINED_PTR_64_KERNEL_CACHE: strcpy(formatted, "DYLD_CHAINED_PTR_64_KERNEL_CACHE"); break;
+        case DYLD_CHAINED_PTR_ARM64E_USERLAND: strcpy(formatted, "DYLD_CHAINED_PTR_ARM64E_USERLAND"); break;
+        case DYLD_CHAINED_PTR_ARM64E_FIRMWARE: strcpy(formatted, "DYLD_CHAINED_PTR_ARM64E_FIRMWARE"); break;
+        case DYLD_CHAINED_PTR_X86_64_KERNEL_CACHE: strcpy(formatted, "DYLD_CHAINED_PTR_X86_64_KERNEL_CACHE"); break;
+        case DYLD_CHAINED_PTR_ARM64E_USERLAND24: strcpy(formatted, "DYLD_CHAINED_PTR_ARM64E_USERLAND24"); break;
+        default: strcpy(formatted, "UNKNOWN");
+    }
+}
+
+- (MVNode *)createFixupImageSegmentNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                        offset:(uint32_t)offset
+                        startsInSegment:(struct dyld_chained_starts_in_segment const *)startsInSegment
+{
+    MVNodeSaver nodeSaver;
+    MVNode * node = [parent insertChildWithDetails:caption location:location length:sizeof(struct dyld_chained_starts_in_segment) saver:nodeSaver];
+    
+    NSRange range = NSMakeRange(location,0);
+    NSString * lastReadHex;
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"size"
+                           :@(startsInSegment->size).stringValue];
+    
+    [dataController read_uint16:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"page_size"
+                           :@(startsInSegment->page_size).stringValue];
+    
+    [dataController read_uint16:range lastReadHex:&lastReadHex];
+    char formatted_pointer_format[256];
+    formatPointerFormat(startsInSegment->pointer_format, formatted_pointer_format);
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"pointer_format"
+                           :[NSString stringWithCString:formatted_pointer_format encoding:NSUTF8StringEncoding]];
+    
+    [dataController read_uint64:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"segment_offset"
+                           :@(startsInSegment->segment_offset).stringValue];
+    
+    [dataController read_uint32:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"max_valid_pointer"
+                           :@(startsInSegment->max_valid_pointer).stringValue];
+    
+    [dataController read_uint16:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"page_count"
+                           :@(startsInSegment->page_count).stringValue];
+    
+    [dataController read_uint16:range lastReadHex:&lastReadHex];
+    [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                           :lastReadHex
+                           :@"page_start"
+                           :@""];
+    
+    for (uint32_t i = 0; i < startsInSegment->page_count; i++) {
+        [node.details appendRow:@""
+                               :@""
+                               :[NSString stringWithFormat:@"offset: %d", i]
+                               :@(startsInSegment->page_start[i]).stringValue];
+    }
+    
+    return node;
+}
+//-----------------------------------------------------------------------------
+
+- (MVNode *)createFixupPageStartsNode:(MVNode *)parent
+                         caption:(NSString *)caption
+                        location:(uint32_t)location
+                        pageIndex:(uint32_t)pageIndex
+                           fixup_base:(uint32_t)fixup_base
+                              segname:(const char *)segname
+                      header:(struct dyld_chained_fixups_header const *)header
+                      startsInSegment:(struct dyld_chained_starts_in_segment const *)startsInSegment
+{
+    MVNodeSaver nodeSaver;
+    MVNode * node = [parent insertChildWithDetails:caption location:location length:sizeof(struct dyld_chained_starts_in_segment) saver:nodeSaver];
+    
+    NSRange range = NSMakeRange(location,0);
+    NSString * lastReadHex;
+    
+    bool done = false;
+    int count = 0;
+    while (!done) {
+        if (startsInSegment->pointer_format == DYLD_CHAINED_PTR_64
+            || startsInSegment->pointer_format == DYLD_CHAINED_PTR_64_OFFSET) {
+            MATCH_STRUCT(dyld_chained_ptr_64_bind, location)
+            if (dyld_chained_ptr_64_bind->bind) {
+                MATCH_STRUCT(dyld_chained_import, fixup_base + header->imports_offset)
+                struct dyld_chained_import import = dyld_chained_import[dyld_chained_ptr_64_bind->ordinal];
+                char *symbol = (char *) [self imageAt:(fixup_base + header->symbols_offset + import.name_offset)];
+//                printf("---        0x%08x BIND     ordinal: %d   addend: %d    reserved: %d   (%p) (%s)\n",
+//                       location, dyld_chained_ptr_64_bind->ordinal, dyld_chained_ptr_64_bind->addend, dyld_chained_ptr_64_bind->reserved, symbol, symbol);
+                // TODO: lihui02 range error
+                [dataController read_uint64:range lastReadHex:&lastReadHex];
+                [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                                       :lastReadHex
+                                       :@"address"
+                                       :[NSString stringWithFormat:@"0x%x", location]];
+                
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"segment"
+                                       :[NSString stringWithCString:segname encoding:NSUTF8StringEncoding]];
+                // TODO: lihui02 missing section field
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"type"
+                                       :@"BIND"];
+                
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"target"
+                                       :[NSString stringWithCString:symbol encoding:NSUTF8StringEncoding]];
+            } else {
+                // rebase
+                struct dyld_chained_ptr_64_rebase rebase = *(struct dyld_chained_ptr_64_rebase *)dyld_chained_ptr_64_bind;
+//                printf("---        %#010x REBASE   target: %#010llx   high8: %d\n",
+//                       location, rebase.target, rebase.high8);
+                
+                [dataController read_uint64:range lastReadHex:&lastReadHex];
+                [node.details appendRow:[NSString stringWithFormat:@"%.8lX", range.location]
+                                       :lastReadHex
+                                       :@"address"
+                                       :[NSString stringWithFormat:@"0x%x", location]];
+                
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"segment"
+                                       :[NSString stringWithCString:segname encoding:NSUTF8StringEncoding]];
+                
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"type"
+                                       :@"REBASE"];
+                
+                [node.details appendRow:@""
+                                       :@""
+                                       :@"target"
+                                       :[NSString stringWithFormat:@"0x%llx", rebase.target]];
+            }
+            
+            if (dyld_chained_ptr_64_bind->next == 0) {
+                done = true;
+            } else {
+                location += dyld_chained_ptr_64_bind->next * 4;
+            }
+            
+        } else {
+//            printf("Unsupported pointer format: 0x%x", startsInSegment->pointer_format);
+            break;
+        }
+        
+        count++;
+    }
+    
+    return node;
 }
 //-----------------------------------------------------------------------------
 

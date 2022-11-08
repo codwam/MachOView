@@ -17,6 +17,7 @@
 #import "SectionContents.h"
 #import "ObjC.h"
 #import "CRTFootPrints.h"
+#include <mach-o/fixup-chains.h>
 
 using namespace std;
 
@@ -1014,6 +1015,7 @@ _hex2int(char const * a, uint32_t len)
   
   // find related load commands
   struct dyld_info_command const * dyld_info_command = NULL;
+  struct linkedit_data_command const * dyld_chained_fixups_command = NULL;
   
   for (CommandVector::const_iterator cmdIter = commands.begin(); cmdIter != commands.end(); ++cmdIter)
   {
@@ -1039,9 +1041,91 @@ _hex2int(char const * a, uint32_t len)
       } break;
       case LC_DYLD_INFO:
       case LC_DYLD_INFO_ONLY: dyld_info_command = (struct dyld_info_command const *)load_command; break;
+        case LC_DYLD_CHAINED_FIXUPS: dyld_chained_fixups_command = (struct linkedit_data_command const *)load_command; break;
       default: ; // not interested
     }
   }
+    
+    if (dyld_chained_fixups_command) {
+        uint32_t dataoff = dyld_chained_fixups_command->dataoff;
+        uint32_t datasize = dyld_chained_fixups_command->datasize;
+        MVNode * dyldInfoNode = [self createDataNode:rootNode
+                                             caption:@"Chained Fixups"
+                                            location:dataoff
+                                              length:datasize];
+        const uint64_t fixup_base = imageOffset + dataoff;
+        MATCH_STRUCT(dyld_chained_fixups_header, fixup_base);
+        
+        NSString * lastNodeCaption;
+        @try
+        {
+          if (fixup_base * datasize > 0)
+          {
+              [self createFixupHeaderNode:dyldInfoNode
+                           caption:(lastNodeCaption = @"Chained Header")
+                          location:fixup_base
+                                 header:dyld_chained_fixups_header];
+          }
+          
+            uint64_t fixup_image_base = fixup_base + dyld_chained_fixups_header->starts_offset;
+          if (fixup_image_base > 0)
+          {
+              MATCH_STRUCT(dyld_chained_starts_in_image, fixup_image_base);
+              MVNode *chainedImageNode = [self createFixupImageNode:dyldInfoNode
+                             caption:(lastNodeCaption = @"Chained Image")
+                            location:fixup_image_base
+                            startsInImage:dyld_chained_starts_in_image];
+              // create segments
+              for (uint32_t i = 0; i < dyld_chained_starts_in_image->seg_count; i++) {
+                  uint32_t seg_offset = dyld_chained_starts_in_image->seg_info_offset[i];
+                  uint32_t seg_location = fixup_image_base + seg_offset;
+                  MATCH_STRUCT(dyld_chained_starts_in_segment, seg_location);
+                  // TODO: lihui02 乱序？？？
+                  const char *segname = NULL;
+                  if ([self is64bit]) {
+                      segname = self->segments_64[i]->segname;
+                  } else {
+                      segname = self->segments[i]->segname;
+                  }
+                  MVNode *imageSegmentNode = [self createFixupImageSegmentNode:chainedImageNode
+                                            caption:(lastNodeCaption = [NSString stringWithFormat:@"Image %d (%s, offset: %d)", i, segname, seg_offset])
+                                location:seg_location
+                                             offset:seg_offset
+                                    startsInSegment:dyld_chained_starts_in_segment];
+                  
+                  // create pages
+                  for (uint32_t pageIndex = 0; pageIndex < dyld_chained_starts_in_segment->page_count; pageIndex++) {
+                      uint32_t page_location = dyld_chained_starts_in_segment->segment_offset + dyld_chained_starts_in_segment->page_size * pageIndex + dyld_chained_starts_in_segment->page_start[pageIndex];
+                      [self createFixupPageStartsNode:imageSegmentNode
+                                                caption:(lastNodeCaption = [NSString stringWithFormat:@"Page %d", pageIndex])
+                                    location:page_location
+                                            pageIndex:pageIndex
+                                           fixup_base:fixup_base
+                       segname:segname
+                       header:dyld_chained_fixups_header
+                                        startsInSegment:dyld_chained_starts_in_segment];
+                  }
+              }
+              // create imports
+              for (uint32_t i = 0; i < dyld_chained_fixups_header->imports_count; i++) {
+                  MATCH_STRUCT(dyld_chained_import, fixup_base + dyld_chained_fixups_header->imports_offset)
+                  struct dyld_chained_import import = dyld_chained_import[i];
+
+//                  printf("    [%d] lib_ordinal: %-22s   weak_import: %d   name_offset: %d (%s)\n",
+//                      i, getDylibName(dyld_chained_import.lib_ordinal).c_str(), import.weak_import, import.name_offset,
+//                      (char *)((uint8_t *)header + header->symbols_offset + import.name_offset));
+                  char *symbol = (char *) [self imageAt:fixup_base + dyld_chained_fixups_header->symbols_offset + import.name_offset];
+                  printf("---    [%d] lib_ordinal:   weak_import: %d   name_offset: %d (%s)\n",
+                      i, import.weak_import, import.name_offset,
+                         symbol);
+              }
+          }
+        }
+        @catch(NSException * exception)
+        {
+          [self printException:exception caption:lastNodeCaption];
+        }
+    }
   
   if (dyld_info_command == NULL)
   {
